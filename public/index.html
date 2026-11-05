@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Tablespot — Monitoring ketersediaan kursi dan meja kafe secara real-time" />
+  <title>Tablespot Dashboard</title>
+
+  <!-- Stylesheet -->
+  <link rel="stylesheet" href="style.css" />
+
+  <!--
+    Chart.js v4.4.3 — dimuat via CDN cdnjs, versi dipin.
+    Dimuat SEBELUM app.js agar window.Chart tersedia saat grafik dirender.
+  -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.3/chart.umd.min.js"
+          integrity="sha512-KE2k/6I8OwxeE31vf0+RBW2gMpxRz1tfsmXn6sSoOd7VVpTdqJh7+LGVaRuQZLhBMsYuADYXm1z/9ZPGFDqA=="
+          crossorigin="anonymous"
+          referrerpolicy="no-referrer">
+  </script>
+
+  <!--
+    app.js dimuat sebagai ES module agar bisa menggunakan import statis
+    (Firebase SDK modular dari CDN gstatic, firebase-config.js).
+    defer bawaan untuk type="module".
+  -->
+  <script type="module" src="app.js"></script>
+</head>
+<body>
+
+<div id="app">
+
+  <!-- ========================================================
+       Header + Navigasi Tab
+       ======================================================== -->
+  <header class="header" role="banner">
+    <div class="header__inner">
+      <span class="header__logo">Table<span>spot</span></span>
+
+      <nav class="tabs" role="tablist" aria-label="Navigasi utama">
+        <button
+          class="tab-btn active"
+          role="tab"
+          aria-selected="true"
+          aria-controls="panel-denah"
+          data-tab="denah"
+          id="tab-denah">
+          Denah
+        </button>
+        <button
+          class="tab-btn"
+          role="tab"
+          aria-selected="false"
+          aria-controls="panel-statistik"
+          data-tab="statistik"
+          id="tab-statistik">
+          Statistik
+        </button>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Banner peringatan sistem offline -->
+  <div id="banner-warn" class="banner-warn hidden" role="alert" aria-live="assertive">
+    ⚠ Sistem di kafe tidak terhubung, data mungkin tidak terbaru
+  </div>
+
+  <!-- ========================================================
+       Konten Utama
+       ======================================================== -->
+  <main class="main" role="main">
+
+    <!-- ======================================================
+         Tab Denah (publik)
+         ====================================================== -->
+    <section
+      id="panel-denah"
+      class="tab-panel active"
+      role="tabpanel"
+      aria-labelledby="tab-denah">
+
+      <h1 class="section-title">Denah Kafe</h1>
+
+      <!-- Ringkasan kursi & meja kosong -->
+      <div id="summary-bar" class="summary-bar" aria-live="polite" aria-label="Ringkasan ketersediaan">
+        <!-- Diisi oleh app.js -->
+      </div>
+
+      <!-- Grid kartu meja + kursi -->
+      <div id="denah-container" aria-live="polite" aria-label="Denah meja dan kursi">
+        <!-- Loading awal ditampilkan oleh app.js -->
+        <div class="state-box">
+          <div class="spinner" role="status" aria-label="Memuat data..."></div>
+          <p class="state-box__title">Memuat data...</p>
+          <p class="state-box__msg">Menghubungkan ke Firebase Realtime Database</p>
+        </div>
+      </div>
+
+      <!-- Timestamp terakhir diperbarui -->
+      <p id="last-updated" class="last-updated" aria-live="polite"></p>
+
+    </section>
+
+    <!-- ======================================================
+         Tab Statistik (staf, butuh login)
+         ====================================================== -->
+    <section
+      id="panel-statistik"
+      class="tab-panel"
+      role="tabpanel"
+      aria-labelledby="tab-statistik">
+
+      <!-- === Form Login === -->
+      <div id="login-wrapper" class="login-wrapper">
+        <div class="login-card" role="region" aria-label="Form login staf">
+          <h2>Masuk sebagai Staf</h2>
+
+          <!-- Pesan error login -->
+          <div id="login-error" class="login-error hidden" role="alert" aria-live="assertive"></div>
+
+          <div class="form-group">
+            <label for="login-email">Alamat Email</label>
+            <input
+              type="email"
+              id="login-email"
+              name="email"
+              autocomplete="username"
+              placeholder="staf@kafe.com"
+              required />
+          </div>
+
+          <div class="form-group">
+            <label for="login-password">Kata Sandi</label>
+            <input
+              type="password"
+              id="login-password"
+              name="password"
+              autocomplete="current-password"
+              placeholder="••••••••"
+              required />
+          </div>
+
+          <button id="login-btn" class="btn-primary" type="button">Masuk</button>
+        </div>
+      </div>
+
+      <!-- === Konten Statistik (tampil setelah login) === -->
+      <div id="stats-content" style="display:none;">
+
+        <!-- Header: email pengguna + tombol keluar -->
+        <div class="stats-header">
+          <div>
+            <h1 class="section-title" style="margin-bottom:0;">Statistik Kafe</h1>
+            <p class="stats-user">Masuk sebagai: <strong id="stats-user-label"></strong></p>
+          </div>
+          <button id="logout-btn" class="btn-logout" type="button">Keluar</button>
+        </div>
+
+        <!-- Timestamp statistik -->
+        <p id="stats-updated-label" class="stats-updated" aria-live="polite"></p>
+
+        <!-- Kartu ringkasan -->
+        <div id="stats-cards" class="stats-cards" aria-label="Ringkasan statistik">
+          <!-- Diisi oleh app.js -->
+        </div>
+
+        <!-- Grafik okupansi per jam -->
+        <div class="chart-section">
+          <p class="chart-section__title">Rata-rata Okupansi per Jam</p>
+
+          <!-- Toggle hari kerja / akhir pekan -->
+          <div class="chart-toggle" role="group" aria-label="Pilih periode">
+            <button
+              id="chart-toggle-kerja"
+              class="active"
+              type="button"
+              aria-pressed="true">
+              Hari Kerja
+            </button>
+            <button
+              id="chart-toggle-akhirpekan"
+              class="inactive"
+              type="button"
+              aria-pressed="false">
+              Akhir Pekan
+            </button>
+          </div>
+
+          <!-- Canvas Chart.js -->
+          <div class="chart-container" aria-label="Grafik batang okupansi per jam">
+            <canvas id="occupancy-chart" aria-label="Grafik batang okupansi" role="img"></canvas>
+          </div>
+
+          <!-- Pesan jika data belum tersedia -->
+          <p id="no-data-chart" class="no-data" style="display:none;">
+            Data belum cukup untuk statistik grafik ini.
+          </p>
+        </div>
+
+        <!-- Tabel pemakaian per meja -->
+        <div class="table-section">
+          <p class="table-section__title">Pemakaian per Meja</p>
+          <div class="stats-table-wrapper">
+            <table class="stats-table" aria-label="Tabel pemakaian per meja">
+              <thead>
+                <tr>
+                  <th scope="col">Meja</th>
+                  <th scope="col">Giliran</th>
+                  <th scope="col">Rata-rata Lama</th>
+                  <th scope="col">% Waktu Terisi</th>
+                </tr>
+              </thead>
+              <tbody id="stats-meja-tbody">
+                <!-- Diisi oleh app.js -->
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Pesan jika data belum tersedia -->
+          <p id="no-data-meja" class="no-data" style="display:none;">
+            Data belum cukup untuk statistik per meja.
+          </p>
+        </div>
+
+      </div><!-- /#stats-content -->
+
+    </section>
+
+  </main><!-- /.main -->
+
+</div><!-- /#app -->
+
+</body>
+</html>
