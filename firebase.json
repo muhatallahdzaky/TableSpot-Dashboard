@@ -1,5 +1,6 @@
 {
   "hosting": {
+    "site": "tablespot-cafe",
     "public": "public",
     "ignore": [
       "firebase.json",
